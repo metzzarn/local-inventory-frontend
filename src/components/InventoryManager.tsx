@@ -1,23 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
     PlusCircle,
-    Trash2,
     Plus,
-    Minus,
-    Check,
-    X,
     Camera,
     XCircle,
     LogOut,
     Settings,
     Menu,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/useApi";
 import { Item } from "@/types";
 import { ViewMode } from "./AppRouter";
+import { InventoryTable } from "./InventoryTable";
+import { AddItemForm } from "./AddItemForm";
 
 interface InventoryManagerProps {
     onNavigate: (view: ViewMode) => void;
@@ -36,21 +34,12 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         category: "",
     });
 
-    const [editingCell, setEditingCell] = useState<{
-        id: number;
-        field: keyof Item;
-    } | null>(null);
-    const [editValue, setEditValue] = useState("");
     const [showAlert, setShowAlert] = useState(false);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showScanner, setShowScanner] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
 
-    const editInputRef = useRef<HTMLInputElement>(null);
-    const suggestionsRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 
     // Fetch items with authentication
@@ -69,29 +58,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     useEffect(() => {
         fetchItems();
     }, []);
-
-    useEffect(() => {
-        if (editingCell && editInputRef.current) {
-            editInputRef.current.focus();
-        }
-    }, [editingCell]);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (
-                editInputRef.current &&
-                !editInputRef.current.contains(event.target as Node) &&
-                (!suggestionsRef.current ||
-                    !suggestionsRef.current.contains(event.target as Node))
-            ) {
-                saveEdit();
-            }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () =>
-            document.removeEventListener("mousedown", handleClickOutside);
-    }, [editingCell, editValue]);
 
     useEffect(() => {
         return () => {
@@ -136,12 +102,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         stopCamera();
     };
 
-    const getRowColor = (quantity: number) => {
-        if (quantity <= 5) return "bg-red-50";
-        if (quantity <= 20) return "bg-yellow-50";
-        return "";
-    };
-
     const handleQuantityChange = async (id: number, increment: number) => {
         const item = items.find((i) => i.id === id);
         if (!item) return;
@@ -164,34 +124,17 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         }
     };
 
-    const getUniqueCategories = () => {
-        return Array.from(new Set(items.map((item) => item.category)));
-    };
-
-    const filterSuggestions = (input: string) => {
-        const uniqueCategories = getUniqueCategories();
-        const filtered = uniqueCategories.filter((category) =>
-            category.toLowerCase().includes(input.toLowerCase())
-        );
-        setSuggestions(filtered);
-        setShowSuggestions(true);
-    };
-
-    const handleAddItem = async () => {
-        if (!newItem.name || !newItem.quantity || !newItem.category) {
-            setShowAlert(true);
-            return;
-        }
-
+    const handleAddItem = async (itemData: {
+        name: string;
+        quantity: number;
+        category: string;
+    }) => {
         try {
             const response = await makeRequest(
                 "http://localhost:3001/api/items",
                 {
                     method: "POST",
-                    body: JSON.stringify({
-                        ...newItem,
-                        quantity: parseInt(newItem.quantity),
-                    }),
+                    body: JSON.stringify(itemData),
                 }
             );
 
@@ -202,6 +145,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
             setShowAddForm(false);
         } catch (error) {
             console.error("Error adding item:", error);
+            setShowAlert(true);
         }
     };
 
@@ -219,147 +163,27 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         }
     };
 
-    const startEditing = (
-        id: number,
-        field: keyof Item,
-        value: string | number
-    ) => {
-        setEditingCell({ id, field });
-        setEditValue(value.toString());
-        setShowSuggestions(field === "category");
-        if (field === "category") {
-            filterSuggestions(value.toString());
-        }
-    };
-
-    const handleCellClick = (
-        id: number,
-        field: keyof Item,
-        value: string | number
-    ) => {
-        if (!editingCell) {
-            startEditing(id, field, value);
-        }
-    };
-
-    const saveEdit = async () => {
-        if (editingCell) {
-            try {
-                const response = await makeRequest(
-                    `http://localhost:3001/api/items/${editingCell.id}`,
-                    {
-                        method: "PATCH",
-                        body: JSON.stringify({
-                            [editingCell.field]: editValue,
-                        }),
-                    }
-                );
-
-                const updatedItem = await response.json();
-                setItems(
-                    items.map((item) =>
-                        item.id === editingCell.id ? updatedItem : item
-                    )
-                );
-                setEditingCell(null);
-                setEditValue("");
-                setShowSuggestions(false);
-            } catch (error) {
-                console.error("Error updating item:", error);
-            }
-        }
-    };
-
-    const cancelEdit = () => {
-        setEditingCell(null);
-        setEditValue("");
-        setShowSuggestions(false);
-    };
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter") {
-            saveEdit();
-        } else if (e.key === "Escape") {
-            cancelEdit();
-        }
-    };
-
-    const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const input = e.target.value;
-        setEditValue(input);
-        filterSuggestions(input);
-    };
-
-    const handleSelectCategory = (category: string) => {
-        setEditValue(category);
-        saveEdit();
-    };
-
-    const renderCell = (item: Item, field: keyof Item) => {
-        const isEditing =
-            editingCell?.id === item.id && editingCell?.field === field;
-
-        if (isEditing) {
-            return (
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-grow">
-                        <input
-                            ref={editInputRef}
-                            type="text"
-                            className="w-full p-2 border rounded text-sm"
-                            value={editValue}
-                            onChange={
-                                field === "category"
-                                    ? handleCategoryChange
-                                    : (e) => setEditValue(e.target.value)
-                            }
-                            onKeyDown={handleKeyPress}
-                        />
-                        {field === "category" &&
-                            showSuggestions &&
-                            suggestions.length > 0 && (
-                                <div
-                                    className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg"
-                                    ref={suggestionsRef}
-                                >
-                                    {suggestions.map((category, index) => (
-                                        <div
-                                            key={index}
-                                            className="p-2 hover:bg-gray-100 cursor-pointer text-sm"
-                                            onClick={() =>
-                                                handleSelectCategory(category)
-                                            }
-                                        >
-                                            {category}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                    </div>
-                    <button
-                        onClick={saveEdit}
-                        className="text-green-500 hover:text-green-700 p-1"
-                    >
-                        <Check className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={cancelEdit}
-                        className="text-red-500 hover:text-red-700 p-1"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
+    const handleUpdateItem = async (id: number, field: keyof Item, value: string) => {
+        try {
+            const response = await makeRequest(
+                `http://localhost:3001/api/items/${id}`,
+                {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                        [field]: value,
+                    }),
+                }
             );
-        }
 
-        return (
-            <div
-                className="cursor-pointer hover:bg-gray-100 p-2 rounded min-h-[44px] flex items-center text-sm"
-                onClick={() => handleCellClick(item.id, field, item[field])}
-            >
-                {item[field]}
-            </div>
-        );
+            const updatedItem = await response.json();
+            setItems(
+                items.map((item) =>
+                    item.id === id ? updatedItem : item
+                )
+            );
+        } catch (error) {
+            console.error("Error updating item:", error);
+        }
     };
 
     return (
@@ -467,98 +291,12 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
 
                 {/* Add Item Form */}
                 {showAddForm && (
-                    <Card className="mb-4">
-                        <CardHeader>
-                            <CardTitle className="text-lg">
-                                Add New Item
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <input
-                                    type="text"
-                                    placeholder="Item Name"
-                                    className="w-full p-3 border rounded-lg text-base min-h-[44px]"
-                                    value={newItem.name}
-                                    onChange={(e) =>
-                                        setNewItem({
-                                            ...newItem,
-                                            name: e.target.value,
-                                        })
-                                    }
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Quantity"
-                                    className="w-full p-3 border rounded-lg text-base min-h-[44px]"
-                                    value={newItem.quantity}
-                                    onChange={(e) =>
-                                        setNewItem({
-                                            ...newItem,
-                                            quantity: e.target.value,
-                                        })
-                                    }
-                                />
-                                <div className="relative" ref={suggestionsRef}>
-                                    <input
-                                        type="text"
-                                        placeholder="Category"
-                                        className="w-full p-3 border rounded-lg text-base min-h-[44px]"
-                                        value={newItem.category}
-                                        onChange={(e) => {
-                                            setNewItem({
-                                                ...newItem,
-                                                category: e.target.value,
-                                            });
-                                            filterSuggestions(e.target.value);
-                                        }}
-                                        onFocus={() =>
-                                            filterSuggestions(newItem.category)
-                                        }
-                                    />
-                                    {showSuggestions &&
-                                        suggestions.length > 0 && (
-                                            <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg">
-                                                {suggestions.map(
-                                                    (category, index) => (
-                                                        <div
-                                                            key={index}
-                                                            className="p-3 hover:bg-gray-100 cursor-pointer text-base"
-                                                            onClick={() => {
-                                                                setNewItem({
-                                                                    ...newItem,
-                                                                    category,
-                                                                });
-                                                                setShowSuggestions(
-                                                                    false
-                                                                );
-                                                            }}
-                                                        >
-                                                            {category}
-                                                        </div>
-                                                    )
-                                                )}
-                                            </div>
-                                        )}
-                                </div>
-                                <div className="flex gap-3">
-                                    <button
-                                        className="flex-1 bg-blue-500 text-white p-3 rounded-lg flex items-center justify-center gap-2 min-h-[44px]"
-                                        onClick={handleAddItem}
-                                    >
-                                        <PlusCircle className="w-4 h-4" />
-                                        Add Item
-                                    </button>
-                                    <button
-                                        className="bg-gray-500 text-white p-3 rounded-lg min-h-[44px]"
-                                        onClick={() => setShowAddForm(false)}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <AddItemForm
+                        onAddItem={handleAddItem}
+                        onCancel={() => setShowAddForm(false)}
+                        existingItems={items}
+                        initialValues={newItem}
+                    />
                 )}
 
                 {/* Alert */}
@@ -587,182 +325,44 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                 </div>
 
                 {/* Items Table/Cards */}
-                <div className="space-y-3">
-                    {/* Desktop Table */}
-                    <div className="hidden md:block">
-                        <Card>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr className="bg-gray-100">
-                                                <th className="p-3 text-left">
-                                                    Name
-                                                </th>
-                                                <th className="p-3 text-left">
-                                                    Quantity
-                                                </th>
-                                                <th className="p-3 text-left">
-                                                    Category
-                                                </th>
-                                                <th className="p-3 text-left">
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {items.map((item) => (
-                                                <tr
-                                                    key={item.id}
-                                                    className={`border-b transition-colors ${getRowColor(
-                                                        item.quantity
-                                                    )}`}
-                                                >
-                                                    <td className="p-3">
-                                                        {renderCell(
-                                                            item,
-                                                            "name"
-                                                        )}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                onClick={() =>
-                                                                    handleQuantityChange(
-                                                                        item.id,
-                                                                        -1
-                                                                    )
-                                                                }
-                                                                className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 rounded min-h-[44px]"
-                                                            >
-                                                                <Minus className="w-4 h-4" />
-                                                            </button>
-                                                            <span className="min-w-[3rem] text-center font-medium">
-                                                                {item.quantity}
-                                                            </span>
-                                                            <button
-                                                                onClick={() =>
-                                                                    handleQuantityChange(
-                                                                        item.id,
-                                                                        1
-                                                                    )
-                                                                }
-                                                                className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 rounded min-h-[44px]"
-                                                            >
-                                                                <Plus className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-3">
-                                                        {renderCell(
-                                                            item,
-                                                            "category"
-                                                        )}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <button
-                                                            onClick={() =>
-                                                                handleDeleteItem(
-                                                                    item.id
-                                                                )
-                                                            }
-                                                            className="p-2 text-red-500 hover:text-red-700 min-h-[44px]"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Mobile Cards */}
-                    <div className="md:hidden space-y-3">
-                        {items.map((item) => (
-                            <Card
-                                key={item.id}
-                                className={`${getRowColor(item.quantity)}`}
+                {items.length > 0 ? (
+                    <InventoryTable
+                        items={items}
+                        onQuantityChange={handleQuantityChange}
+                        onDeleteItem={handleDeleteItem}
+                        onUpdateItem={handleUpdateItem}
+                    />
+                ) : (
+                    /* Empty State */
+                    <div className="text-center py-16">
+                        <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <PlusCircle className="w-12 h-12 text-blue-600" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            No Items Yet
+                        </h3>
+                        <p className="text-gray-500 mb-8 max-w-sm mx-auto">
+                            Start building your inventory by adding your first
+                            item. Use the + button or scan a barcode to get
+                            started.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <button
+                                onClick={() => setShowAddForm(true)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200 flex items-center justify-center gap-2"
                             >
-                                <CardContent className="p-4">
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-start">
-                                            <div className="flex-1">
-                                                <div className="font-medium text-base mb-1">
-                                                    {renderCell(item, "name")}
-                                                </div>
-                                                <div className="text-sm text-gray-600">
-                                                    Category:{" "}
-                                                    {renderCell(
-                                                        item,
-                                                        "category"
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() =>
-                                                    handleDeleteItem(item.id)
-                                                }
-                                                className="p-2 text-red-500 hover:text-red-700 min-h-[44px] min-w-[44px]"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-medium text-gray-700">
-                                                Quantity:
-                                            </span>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() =>
-                                                        handleQuantityChange(
-                                                            item.id,
-                                                            -1
-                                                        )
-                                                    }
-                                                    className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 rounded min-h-[44px] min-w-[44px]"
-                                                >
-                                                    <Minus className="w-4 h-4" />
-                                                </button>
-                                                <span className="text-lg font-semibold min-w-[3rem] text-center">
-                                                    {item.quantity}
-                                                </span>
-                                                <button
-                                                    onClick={() =>
-                                                        handleQuantityChange(
-                                                            item.id,
-                                                            1
-                                                        )
-                                                    }
-                                                    className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 rounded min-h-[44px] min-w-[44px]"
-                                                >
-                                                    <Plus className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
+                                <Plus className="w-5 h-5" />
+                                Add First Item
+                            </button>
+                            <button
+                                onClick={startCamera}
+                                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+                            >
+                                <Camera className="w-5 h-5" />
+                                Scan Barcode
+                            </button>
+                        </div>
                     </div>
-                </div>
-
-                {/* Empty State */}
-                {items.length === 0 && (
-                    <Card className="mt-8">
-                        <CardContent className="p-8 text-center">
-                            <div className="text-gray-500 mb-4">
-                                <PlusCircle className="w-12 h-12 mx-auto mb-2" />
-                                <p className="text-lg">No items in inventory</p>
-                                <p className="text-sm">
-                                    Add your first item to get started
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
                 )}
             </div>
         </div>
