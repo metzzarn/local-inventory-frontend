@@ -163,28 +163,40 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         }
     };
 
-    const handleUpdateItem = async (id: number, field: keyof Item, value: string) => {
-        try {
-            const response = await makeRequest(
-                `http://localhost:3001/api/items/${id}`,
-                {
-                    method: "PATCH",
-                    body: JSON.stringify({
-                        [field]: value,
-                    }),
-                }
-            );
-
-            const updatedItem = await response.json();
-            setItems(
-                items.map((item) =>
-                    item.id === id ? updatedItem : item
-                )
-            );
-        } catch (error) {
-            console.error("Error updating item:", error);
+const handleUpdateItem = async (id: number, field: keyof Item, value: string) => {
+    try {
+        // Find the current item to get all its current values
+        const currentItem = items.find(item => item.id === id);
+        if (!currentItem) {
+            console.error("Item not found");
+            return;
         }
-    };
+
+        // Create the updated item data with all fields
+        const updatedItemData = {
+            name: field === 'name' ? value : currentItem.name,
+            quantity: field === 'quantity' ? parseInt(value) || 0 : currentItem.quantity,
+            category: field === 'category' ? value : currentItem.category,
+        };
+
+        const response = await makeRequest(
+            `http://localhost:3001/api/items/${id}`,
+            {
+                method: "PUT",
+                body: JSON.stringify(updatedItemData),
+            }
+        );
+
+        const updatedItem = await response.json();
+        setItems(
+            items.map((item) =>
+                item.id === id ? updatedItem : item
+            )
+        );
+    } catch (error) {
+        console.error("Error updating item:", error);
+    }
+};
 
     return (
         <div className="min-h-screen bg-gray-50">
