@@ -68,14 +68,14 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
     };
 
     const getStockStatus = (quantity: number) => {
-        if (quantity <= 5) {
+        if (quantity <= 1) {
             return {
                 color: "bg-red-50 border-red-200",
                 indicator: "bg-red-500 animate-pulse",
                 label: "Low Stock",
                 textColor: "text-red-800",
             };
-        } else if (quantity <= 20) {
+        } else if (quantity <= 3) {
             return {
                 color: "bg-yellow-50 border-yellow-200",
                 indicator: "bg-yellow-500",
@@ -116,19 +116,19 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                 <Card className="overflow-hidden shadow-sm">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full">
+                            <table className="w-full table-fixed">
                                 <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
                                     <tr>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/3">
                                             Item
                                         </th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">
                                             Quantity
                                         </th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-48 min-w-[12rem]">
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">
                                             Category
                                         </th>
-                                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">
                                             Actions
                                         </th>
                                     </tr>
@@ -143,7 +143,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                                 key={item.id}
                                                 className={`hover:bg-gray-50 transition-colors ${stockStatus.color}`}
                                             >
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                <td className="px-6 py-4 whitespace-nowrap w-1/3">
                                                     <div className="flex items-center">
                                                         <div className="flex-shrink-0 h-10 w-10">
                                                             <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center">
@@ -154,7 +154,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        <div className="ml-4">
+                                                        <div className="ml-4 flex-1 min-w-0">
                                                             <div className="text-sm font-medium text-gray-900">
                                                                 <EditableCell
                                                                     item={item}
@@ -170,7 +170,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                <td className="px-6 py-4 whitespace-nowrap w-1/4">
                                                     <div className="flex items-center space-x-3">
                                                         <button
                                                             onClick={() =>
@@ -211,19 +211,21 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                                         </button>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap w-48 min-w-[12rem]">
-                                                    <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 w-full">
-                                                        <EditableCell
-                                                            item={item}
-                                                            field="category"
-                                                            onUpdateItem={handleUpdateItem}
-                                                            getSuggestions={getUniqueCategories}
-                                                            placeholder="Enter category"
-                                                            isLoading={isLoading === item.id}
-                                                        />
-                                                    </span>
+                                                <td className="px-6 py-4 whitespace-nowrap w-1/6">
+                                                    <div className="w-full max-w-full overflow-hidden">
+                                                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 w-full max-w-full">
+                                                            <EditableCell
+                                                                item={item}
+                                                                field="category"
+                                                                onUpdateItem={handleUpdateItem}
+                                                                getSuggestions={getUniqueCategories}
+                                                                placeholder="Enter category"
+                                                                isLoading={isLoading === item.id}
+                                                            />
+                                                        </span>
+                                                    </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <td className="px-6 py-4 whitespace-nowrap text-center w-1/12">
                                                     <button
                                                         onClick={() =>
                                                             handleDeleteItem(item.id)

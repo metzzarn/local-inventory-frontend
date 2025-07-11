@@ -136,8 +136,8 @@ export const EditableCell: React.FC<EditableCellProps> = ({
 
     if (isEditing) {
         return (
-            <div ref={containerRef} className="relative min-w-full">
-                <div className="flex items-center gap-1 min-w-0">
+            <div ref={containerRef} className="relative w-full max-w-full">
+                <div className="flex items-center gap-1 w-full max-w-full overflow-hidden">
                     <input
                         ref={inputRef}
                         type="text"
@@ -146,20 +146,23 @@ export const EditableCell: React.FC<EditableCellProps> = ({
                         onKeyDown={handleKeyDown}
                         className="flex-1 min-w-0 px-2 py-1 text-sm border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         placeholder={placeholder}
+                        style={{ width: 'calc(100% - 64px)' }}
                     />
-                    <button
-                        onClick={handleSaveEdit}
-                        className="flex-shrink-0 p-1 text-green-600 hover:text-green-800 hover:bg-green-50 rounded"
-                        disabled={isLoading || editValue.trim() === ""}
-                    >
-                        <Check className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={handleCancelEdit}
-                        className="flex-shrink-0 p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                            onClick={handleSaveEdit}
+                            className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 rounded"
+                            disabled={isLoading || editValue.trim() === ""}
+                        >
+                            <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={handleCancelEdit}
+                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
 
                 {showSuggestions && suggestions.length > 0 && 
