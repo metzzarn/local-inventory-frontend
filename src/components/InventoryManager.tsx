@@ -7,6 +7,7 @@ import {
     LogOut,
     Settings,
     Menu,
+    Shield,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -217,6 +218,15 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
                             <span className="text-sm text-gray-600">
                                 Welcome, {user?.username}
                             </span>
+                            {user?.role === 'admin' && (
+                                <button
+                                    onClick={() => onNavigate("admin")}
+                                    className="text-purple-500 hover:text-purple-700 flex items-center gap-1"
+                                >
+                                    <Shield className="w-4 h-4" />
+                                    Admin
+                                </button>
+                            )}
                             <button
                                 onClick={() => onNavigate("profile")}
                                 className="text-blue-500 hover:text-blue-700 flex items-center gap-1"
@@ -242,6 +252,18 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
                             <span className="text-sm text-gray-600 px-2">
                                 Welcome, {user?.username}
                             </span>
+                            {user?.role === 'admin' && (
+                                <button
+                                    onClick={() => {
+                                        onNavigate("admin");
+                                        setShowMobileMenu(false);
+                                    }}
+                                    className="text-purple-500 hover:text-purple-700 flex items-center gap-2 px-2 py-1"
+                                >
+                                    <Shield className="w-4 h-4" />
+                                    Admin
+                                </button>
+                            )}
                             <button
                                 onClick={() => {
                                     onNavigate("profile");

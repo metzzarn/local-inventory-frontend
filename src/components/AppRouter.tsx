@@ -3,8 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { InventoryManager } from './InventoryManager';
 import { LoginForm } from './LoginForm';
 import { UserProfile } from './UserProfile';
+import { AdminPage } from './AdminPage';
 
-export type ViewMode = 'inventory' | 'profile';
+export type ViewMode = 'inventory' | 'profile' | 'admin';
 
 export const AppRouter: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -25,6 +26,8 @@ export const AppRouter: React.FC = () => {
   switch (currentView) {
     case 'profile':
       return <UserProfile onBack={() => setCurrentView('inventory')} />;
+    case 'admin':
+      return <AdminPage onBack={() => setCurrentView('inventory')} />;
     case 'inventory':
     default:
       return <InventoryManager onNavigate={setCurrentView} />;
