@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Plus, Minus, Trash2 } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Plus, Minus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Item } from "@/types";
 import { EditableCell } from "./EditableCell";
@@ -15,6 +15,14 @@ interface InventoryTableProps {
     ) => Promise<void>;
 }
 
+type SortField = 'name' | 'category';
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+    field: SortField;
+    direction: SortDirection;
+}
+
 export const InventoryTable: React.FC<InventoryTableProps> = ({
     items,
     onQuantityChange,
@@ -22,11 +30,51 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
     onUpdateItem,
 }) => {
     const [isLoading, setIsLoading] = useState<number | null>(null);
+    const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
     const getUniqueCategories = (): string[] => {
         return Array.from(
             new Set(items.map((item) => item.category).filter(Boolean))
         );
+    };
+
+    const sortedItems = useMemo(() => {
+        if (!sortConfig) return items;
+
+        return [...items].sort((a, b) => {
+            const aValue = a[sortConfig.field].toLowerCase();
+            const bValue = b[sortConfig.field].toLowerCase();
+
+            if (aValue < bValue) {
+                return sortConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return sortConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    }, [items, sortConfig]);
+
+    const handleSort = (field: SortField) => {
+        setSortConfig(current => {
+            if (current?.field === field) {
+                if (current.direction === 'asc') {
+                    return { field, direction: 'desc' };
+                } else {
+                    return null; // Remove sorting
+                }
+            }
+            return { field, direction: 'asc' };
+        });
+    };
+
+    const getSortIcon = (field: SortField) => {
+        if (!sortConfig || sortConfig.field !== field) {
+            return null;
+        }
+        return sortConfig.direction === 'asc' ? 
+            <ChevronUp className="w-4 h-4" /> : 
+            <ChevronDown className="w-4 h-4" />;
     };
 
     const handleQuantityChange = async (id: number, increment: number) => {
@@ -120,13 +168,25 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                 <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
                                     <tr>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/3">
-                                            Item
+                                            <button 
+                                                onClick={() => handleSort('name')}
+                                                className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
+                                            >
+                                                <span>Item</span>
+                                                {getSortIcon('name')}
+                                            </button>
                                         </th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">
                                             Quantity
                                         </th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">
-                                            Category
+                                            <button 
+                                                onClick={() => handleSort('category')}
+                                                className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
+                                            >
+                                                <span>Category</span>
+                                                {getSortIcon('category')}
+                                            </button>
                                         </th>
                                         <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">
                                             Actions
@@ -134,7 +194,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {items.map((item) => {
+                                    {sortedItems.map((item) => {
                                         const stockStatus = getStockStatus(
                                             item.quantity
                                         );
@@ -248,7 +308,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
 
             {/* Mobile Cards */}
             <div className="md:hidden space-y-3">
-                {items.map((item) => {
+                {sortedItems.map((item) => {
                     const stockStatus = getStockStatus(item.quantity);
                     return (
                         <Card

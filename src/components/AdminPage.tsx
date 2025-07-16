@@ -285,7 +285,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">Role</label>
-              <SimpleSelect value={newUser.role} onValueChange={(value: 'user' | 'admin') => setNewUser({ ...newUser, role: value })}>
+              <SimpleSelect value={newUser.role} onValueChange={(value: string) => setNewUser({ ...newUser, role: value as 'user' | 'admin' })}>
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </SimpleSelect>
