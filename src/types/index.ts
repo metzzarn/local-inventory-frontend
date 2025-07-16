@@ -1,8 +1,15 @@
+export interface ItemBatch {
+  id: number;
+  quantity: number;
+  expire_date: string | null;
+  created_at: string;
+}
+
 export interface Item {
   id: number;
   name: string;
-  quantity: number;
   category: string;
+  batches?: ItemBatch[];
 }
 
 export interface User {

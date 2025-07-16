@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/useApi";
-import { Item } from "@/types";
+import { Item, ItemBatch } from "@/types";
 import { ViewMode } from "./AppRouter";
 import { InventoryTable } from "./InventoryTable";
 import { AddItemForm } from "./AddItemForm";
@@ -31,11 +31,21 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     const [items, setItems] = useState<Item[]>([]);
     const [newItem, setNewItem] = useState({
         name: "",
-        quantity: "",
         category: "",
     });
 
     const [showAlert, setShowAlert] = useState(false);
+    const [alertMessage, setAlertMessage] = useState("");
+
+    const showErrorAlert = (message: string) => {
+        setAlertMessage(message);
+        setShowAlert(true);
+    };
+
+    const hideAlert = () => {
+        setShowAlert(false);
+        setAlertMessage("");
+    };
     const [showScanner, setShowScanner] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -95,7 +105,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     const handleScan = () => {
         const mockScannedItem = {
             name: "Scanned Item " + Math.floor(Math.random() * 1000),
-            quantity: "1",
             category: "Scanned",
         };
         setNewItem(mockScannedItem);
@@ -103,32 +112,12 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         stopCamera();
     };
 
-    const handleQuantityChange = async (id: number, increment: number) => {
-        const item = items.find((i) => i.id === id);
-        if (!item) return;
-
-        const newQuantity = Math.max(0, item.quantity + increment);
-
-        try {
-            const response = await makeRequest(
-                `http://localhost:3001/api/items/${id}/quantity`,
-                {
-                    method: "PATCH",
-                    body: JSON.stringify({ quantity: newQuantity }),
-                }
-            );
-
-            const updatedItem = await response.json();
-            setItems(items.map((i) => (i.id === id ? updatedItem : i)));
-        } catch (error) {
-            console.error("Error updating quantity:", error);
-        }
-    };
+    // Note: Direct quantity changes removed - items now always use batch management
 
     const handleAddItem = async (itemData: {
         name: string;
-        quantity: number;
         category: string;
+        batches: Omit<ItemBatch, 'id'>[];
     }) => {
         try {
             const response = await makeRequest(
@@ -141,12 +130,66 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
 
             const item = await response.json();
             setItems([...items, item]);
-            setNewItem({ name: "", quantity: "", category: "" });
-            setShowAlert(false);
+            setNewItem({ name: "", category: "" });
+            hideAlert();
             setShowAddForm(false);
         } catch (error) {
             console.error("Error adding item:", error);
-            setShowAlert(true);
+            showErrorAlert("Failed to add item");
+        }
+    };
+
+    const handleUpdateBatch = async (batchId: number, field: 'quantity' | 'expire_date', value: string | number) => {
+        try {
+            const response = await makeRequest(
+                `http://localhost:3001/api/items/batches/${batchId}`,
+                {
+                    method: "PUT",
+                    body: JSON.stringify({ [field]: value }),
+                }
+            );
+
+            const updatedBatch = await response.json();
+            fetchItems(); // Refresh the entire list to get updated totals
+            hideAlert(); // Clear any previous errors
+        } catch (error) {
+            console.error("Error updating batch:", error);
+            showErrorAlert("Failed to update batch");
+        }
+    };
+
+    const handleDeleteBatch = async (batchId: number) => {
+        try {
+            const response = await makeRequest(
+                `http://localhost:3001/api/items/batches/${batchId}`,
+                {
+                    method: "DELETE",
+                }
+            );
+
+            fetchItems(); // Refresh the entire list to get updated totals
+            hideAlert(); // Clear any previous errors
+        } catch (error) {
+            console.error("Error deleting batch:", error);
+            showErrorAlert("Failed to delete batch");
+        }
+    };
+
+    const handleAddBatch = async (itemId: number, quantity: number, expireDate: string | null) => {
+        try {
+            const response = await makeRequest(
+                `http://localhost:3001/api/items/${itemId}/batches`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({ quantity, expire_date: expireDate }),
+                }
+            );
+
+            fetchItems(); // Refresh the entire list to get updated totals
+            hideAlert(); // Clear any previous errors
+        } catch (error) {
+            console.error("Error adding batch:", error);
+            showErrorAlert("Failed to add batch");
         }
     };
 
@@ -176,7 +219,6 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
         // Create the updated item data with all fields
         const updatedItemData = {
             name: field === 'name' ? value : currentItem.name,
-            quantity: field === 'quantity' ? parseInt(value) || 0 : currentItem.quantity,
             category: field === 'category' ? value : currentItem.category,
         };
 
@@ -335,9 +377,9 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
 
                 {/* Alert */}
                 {showAlert && (
-                    <Alert variant="destructive" className="mb-4">
+                    <Alert variant="destructive" className="mb-4 cursor-pointer" onClick={hideAlert}>
                         <AlertDescription>
-                            Please fill in all fields before adding an item.
+                            {alertMessage}
                         </AlertDescription>
                     </Alert>
                 )}
@@ -362,9 +404,11 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
                 {items.length > 0 ? (
                     <InventoryTable
                         items={items}
-                        onQuantityChange={handleQuantityChange}
                         onDeleteItem={handleDeleteItem}
                         onUpdateItem={handleUpdateItem}
+                        onUpdateBatch={handleUpdateBatch}
+                        onDeleteBatch={handleDeleteBatch}
+                        onAddBatch={handleAddBatch}
                     />
                 ) : (
                     /* Empty State */

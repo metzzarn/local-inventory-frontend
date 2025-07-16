@@ -1,18 +1,20 @@
 import React, { useState, useMemo } from "react";
-import { Plus, Minus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Minus, Trash2, ChevronUp, ChevronDown, ChevronRight, Calendar, Edit } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Item } from "@/types";
+import { Item, ItemBatch } from "@/types";
 import { EditableCell } from "./EditableCell";
 
 interface InventoryTableProps {
     items: Item[];
-    onQuantityChange: (id: number, increment: number) => Promise<void>;
     onDeleteItem: (id: number) => Promise<void>;
     onUpdateItem: (
         id: number,
         field: keyof Item,
         value: string
     ) => Promise<void>;
+    onUpdateBatch: (batchId: number, field: 'quantity' | 'expire_date', value: string | number) => Promise<void>;
+    onDeleteBatch: (batchId: number) => Promise<void>;
+    onAddBatch: (itemId: number, quantity: number, expireDate: string | null) => Promise<void>;
 }
 
 type SortField = 'name' | 'category';
@@ -25,12 +27,18 @@ interface SortConfig {
 
 export const InventoryTable: React.FC<InventoryTableProps> = ({
     items,
-    onQuantityChange,
     onDeleteItem,
     onUpdateItem,
+    onUpdateBatch,
+    onDeleteBatch,
+    onAddBatch,
 }) => {
     const [isLoading, setIsLoading] = useState<number | null>(null);
     const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+    const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+    const [editingBatch, setEditingBatch] = useState<number | null>(null);
+    const [addingBatchFor, setAddingBatchFor] = useState<number | null>(null);
+    const [newBatchData, setNewBatchData] = useState({ quantity: 1, expire_date: '' });
 
     const getUniqueCategories = (): string[] => {
         return Array.from(
@@ -77,15 +85,11 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
             <ChevronDown className="w-4 h-4" />;
     };
 
-    const handleQuantityChange = async (id: number, increment: number) => {
-        try {
-            setIsLoading(id);
-            await onQuantityChange(id, increment);
-        } catch (error) {
-            console.error("Failed to update quantity:", error);
-        } finally {
-            setIsLoading(null);
+    const getCalculatedQuantity = (item: Item) => {
+        if (item.batches && item.batches.length > 0) {
+            return item.batches.reduce((total, batch) => total + batch.quantity, 0);
         }
+        return 0; // Items should always have batches
     };
 
     const handleDeleteItem = async (id: number) => {
@@ -113,6 +117,112 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
         } finally {
             setIsLoading(null);
         }
+    };
+
+    const toggleExpanded = (itemId: number) => {
+        setExpandedItems(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(itemId)) {
+                newSet.delete(itemId);
+            } else {
+                newSet.add(itemId);
+            }
+            return newSet;
+        });
+    };
+
+    const formatDate = (dateString: string | null) => {
+        if (!dateString) return "No expiry";
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    };
+
+    const formatCreatedDate = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffTime = now.getTime() - date.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) {
+            return { text: "Added today", fullDate: date.toLocaleDateString() };
+        } else if (diffDays === 1) {
+            return { text: "Added yesterday", fullDate: date.toLocaleDateString() };
+        } else if (diffDays < 7) {
+            return { text: `Added ${diffDays} days ago`, fullDate: date.toLocaleDateString() };
+        } else {
+            const fullDate = date.toLocaleDateString();
+            return { text: `Added ${fullDate}`, fullDate };
+        }
+    };
+
+    const isExpiringSoon = (dateString: string | null) => {
+        if (!dateString) return false;
+        const expireDate = new Date(dateString);
+        const today = new Date();
+        const diffTime = expireDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays <= 30 && diffDays >= 0;
+    };
+
+    const isExpired = (dateString: string | null) => {
+        if (!dateString) return false;
+        const expireDate = new Date(dateString);
+        const today = new Date();
+        return expireDate < today;
+    };
+
+    const getExpiryStatus = (dateString: string | null) => {
+        if (isExpired(dateString)) {
+            return { color: "text-red-600", label: "Expired" };
+        } else if (isExpiringSoon(dateString)) {
+            return { color: "text-orange-600", label: "Expiring Soon" };
+        } else {
+            return { color: "text-green-600", label: "Fresh" };
+        }
+    };
+
+    const handleUpdateBatch = async (batchId: number, field: 'quantity' | 'expire_date', value: string | number) => {
+        if (!onUpdateBatch) return;
+        try {
+            setIsLoading(batchId);
+            await onUpdateBatch(batchId, field, value);
+        } catch (error) {
+            console.error("Failed to update batch:", error);
+        } finally {
+            setIsLoading(null);
+            setEditingBatch(null);
+        }
+    };
+
+    const handleDeleteBatch = async (batchId: number) => {
+        if (!onDeleteBatch) return;
+        try {
+            setIsLoading(batchId);
+            await onDeleteBatch(batchId);
+        } catch (error) {
+            console.error("Failed to delete batch:", error);
+        } finally {
+            setIsLoading(null);
+        }
+    };
+
+    const handleAddNewBatch = async (itemId: number) => {
+        if (!onAddBatch) return;
+        try {
+            setIsLoading(itemId);
+            await onAddBatch(itemId, newBatchData.quantity, newBatchData.expire_date || null);
+            setAddingBatchFor(null);
+            setNewBatchData({ quantity: 1, expire_date: '' });
+        } catch (error) {
+            console.error("Failed to add batch:", error);
+        } finally {
+            setIsLoading(null);
+        }
+    };
+
+    const handleCancelAddBatch = () => {
+        setAddingBatchFor(null);
+        setNewBatchData({ quantity: 1, expire_date: '' });
     };
 
     const getStockStatus = (quantity: number) => {
@@ -167,7 +277,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                             <table className="w-full table-fixed">
                                 <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
                                     <tr>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/3">
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">
                                             <button 
                                                 onClick={() => handleSort('name')}
                                                 className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
@@ -176,10 +286,10 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                                 {getSortIcon('name')}
                                             </button>
                                         </th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/8">
                                             Quantity
                                         </th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">
                                             <button 
                                                 onClick={() => handleSort('category')}
                                                 className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
@@ -188,6 +298,9 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                                 {getSortIcon('category')}
                                             </button>
                                         </th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">
+                                            Expiry Info
+                                        </th>
                                         <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">
                                             Actions
                                         </th>
@@ -195,108 +308,234 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {sortedItems.map((item) => {
-                                        const stockStatus = getStockStatus(
-                                            item.quantity
-                                        );
+                                        const calculatedQuantity = getCalculatedQuantity(item);
+                                        const stockStatus = getStockStatus(calculatedQuantity);
+                                        const isExpanded = expandedItems.has(item.id);
+                                        const hasBatches = item.batches && item.batches.length > 0;
+                                        
                                         return (
-                                            <tr
-                                                key={item.id}
-                                                className={`hover:bg-gray-50 transition-colors ${stockStatus.color}`}
-                                            >
-                                                <td className="px-6 py-4 whitespace-nowrap w-1/3">
-                                                    <div className="flex items-center">
-                                                        <div className="flex-shrink-0 h-10 w-10">
-                                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center">
-                                                                <span className="text-white font-bold text-sm">
-                                                                    {item.name
-                                                                        .charAt(0)
-                                                                        .toUpperCase()}
-                                                                </span>
+                                            <React.Fragment key={item.id}>
+                                                <tr className={`hover:bg-gray-50 transition-colors ${stockStatus.color}`}>
+                                                    <td className="px-6 py-4 whitespace-nowrap w-1/4">
+                                                        <div className="flex items-center">
+                                                            {hasBatches && (
+                                                                <button
+                                                                    onClick={() => toggleExpanded(item.id)}
+                                                                    className="mr-2 p-1 hover:bg-gray-200 rounded transition-colors"
+                                                                >
+                                                                    <ChevronRight 
+                                                                        className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+                                                                    />
+                                                                </button>
+                                                            )}
+                                                            <div className="flex-shrink-0 h-10 w-10">
+                                                                <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center">
+                                                                    <span className="text-white font-bold text-sm">
+                                                                        {item.name
+                                                                            .charAt(0)
+                                                                            .toUpperCase()}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="ml-4 flex-1 min-w-0">
+                                                                <div className="text-sm font-medium text-gray-900">
+                                                                    <EditableCell
+                                                                        item={item}
+                                                                        field="name"
+                                                                        onUpdateItem={handleUpdateItem}
+                                                                        placeholder="Enter item name"
+                                                                        isLoading={isLoading === item.id}
+                                                                    />
+                                                                </div>
+                                                                <div className="text-sm text-gray-500">
+                                                                    ID: #{item.id}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                        <div className="ml-4 flex-1 min-w-0">
-                                                            <div className="text-sm font-medium text-gray-900">
-                                                                <EditableCell
-                                                                    item={item}
-                                                                    field="name"
-                                                                    onUpdateItem={handleUpdateItem}
-                                                                    placeholder="Enter item name"
-                                                                    isLoading={isLoading === item.id}
-                                                                />
-                                                            </div>
-                                                            <div className="text-sm text-gray-500">
-                                                                ID: #{item.id}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap w-1/4">
-                                                    <div className="flex items-center space-x-3">
-                                                        <button
-                                                            onClick={() =>
-                                                                handleQuantityChange(
-                                                                    item.id,
-                                                                    -1
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                item.quantity <= 0 ||
-                                                                isLoading === item.id
-                                                            }
-                                                            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        >
-                                                            <Minus className="w-4 h-4" />
-                                                        </button>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap w-1/8">
                                                         <div className="flex items-center space-x-2">
                                                             <span className="text-lg font-bold text-gray-900 min-w-[2ch] text-center">
-                                                                {item.quantity}
+                                                                {calculatedQuantity}
                                                             </span>
                                                             <div
                                                                 className={`w-2 h-2 rounded-full ${stockStatus.indicator}`}
                                                             />
+                                                            <span className="text-xs text-gray-500 ml-2">
+                                                                ({hasBatches ? item.batches!.length : 1} batch{hasBatches && item.batches!.length !== 1 ? 'es' : ''})
+                                                            </span>
                                                         </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap w-1/6">
+                                                        <div className="w-full max-w-full overflow-hidden">
+                                                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 w-full max-w-full">
+                                                                <EditableCell
+                                                                    item={item}
+                                                                    field="category"
+                                                                    onUpdateItem={handleUpdateItem}
+                                                                    getSuggestions={getUniqueCategories}
+                                                                    placeholder="Enter category"
+                                                                    isLoading={isLoading === item.id}
+                                                                />
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap w-1/6">
+                                                        <div className="space-y-1">
+                                                            {hasBatches ? (
+                                                                <div className="flex items-center space-x-2">
+                                                                    <Calendar className="w-4 h-4 text-gray-400" />
+                                                                    <span className="text-sm text-gray-600">
+                                                                        {item.batches!.length} batch{item.batches!.length !== 1 ? 'es' : ''}
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-sm text-gray-500">No batches</div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center w-1/12">
                                                         <button
                                                             onClick={() =>
-                                                                handleQuantityChange(
-                                                                    item.id,
-                                                                    1
-                                                                )
+                                                                handleDeleteItem(item.id)
                                                             }
-                                                            disabled={
-                                                                isLoading === item.id
-                                                            }
-                                                            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            disabled={isLoading === item.id}
+                                                            className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
-                                                            <Plus className="w-4 h-4" />
+                                                            <Trash2 className="w-4 h-4" />
                                                         </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap w-1/6">
-                                                    <div className="w-full max-w-full overflow-hidden">
-                                                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 w-full max-w-full">
-                                                            <EditableCell
-                                                                item={item}
-                                                                field="category"
-                                                                onUpdateItem={handleUpdateItem}
-                                                                getSuggestions={getUniqueCategories}
-                                                                placeholder="Enter category"
-                                                                isLoading={isLoading === item.id}
+                                                    </td>
+                                                </tr>
+                                                
+                                                {/* Expanded rows for batches */}
+                                                {isExpanded && hasBatches && item.batches!.map((batch) => (
+                                                    <tr key={`batch-${batch.id}`} className="bg-gray-50">
+                                                        <td className="px-6 py-3 pl-16">
+                                                            <div 
+                                                                className="text-sm text-gray-600 cursor-help"
+                                                                title={formatCreatedDate(batch.created_at).fullDate}
+                                                            >
+                                                                {formatCreatedDate(batch.created_at).text}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            {editingBatch === batch.id ? (
+                                                                <input
+                                                                    type="number"
+                                                                    defaultValue={batch.quantity}
+                                                                    className="w-20 p-1 border rounded text-sm"
+                                                                    onBlur={(e) => handleUpdateBatch(batch.id, 'quantity', parseInt(e.target.value))}
+                                                                    onKeyPress={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            handleUpdateBatch(batch.id, 'quantity', parseInt(e.currentTarget.value));
+                                                                        }
+                                                                    }}
+                                                                    autoFocus
+                                                                />
+                                                            ) : (
+                                                                <div className="flex items-center space-x-2">
+                                                                    <span className="text-sm font-medium">
+                                                                        {batch.quantity} units
+                                                                    </span>
+                                                                    <button
+                                                                        onClick={() => setEditingBatch(batch.id)}
+                                                                        className="p-1 hover:bg-gray-200 rounded"
+                                                                    >
+                                                                        <Edit className="w-3 h-3 text-gray-500" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="text-sm text-gray-500">-</div>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="flex items-center space-x-2">
+                                                                <Calendar className="w-4 h-4 text-gray-400" />
+                                                                <input
+                                                                    type="date"
+                                                                    defaultValue={batch.expire_date || ''}
+                                                                    className="text-sm border rounded px-2 py-1"
+                                                                    onChange={(e) => handleUpdateBatch(batch.id, 'expire_date', e.target.value || '')}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <button
+                                                                onClick={() => handleDeleteBatch(batch.id)}
+                                                                disabled={isLoading === batch.id}
+                                                                className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                
+                                                {/* Add new batch row - only show when expanded */}
+                                                {isExpanded && addingBatchFor === item.id ? (
+                                                    <tr className="bg-blue-50">
+                                                        <td className="px-6 py-3 pl-16">
+                                                            <div className="text-sm text-blue-600 font-medium">
+                                                                New Batch
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                value={newBatchData.quantity}
+                                                                className="w-20 p-1 border rounded text-sm"
+                                                                onChange={(e) => setNewBatchData({...newBatchData, quantity: Math.max(1, parseInt(e.target.value) || 1)})}
+                                                                autoFocus
                                                             />
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-center w-1/12">
-                                                    <button
-                                                        onClick={() =>
-                                                            handleDeleteItem(item.id)
-                                                        }
-                                                        disabled={isLoading === item.id}
-                                                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="text-sm text-gray-500">-</div>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="flex items-center space-x-2">
+                                                                <Calendar className="w-4 h-4 text-gray-400" />
+                                                                <input
+                                                                    type="date"
+                                                                    value={newBatchData.expire_date}
+                                                                    className="text-sm border rounded px-2 py-1"
+                                                                    onChange={(e) => setNewBatchData({...newBatchData, expire_date: e.target.value})}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="flex items-center space-x-1">
+                                                                <button
+                                                                    onClick={() => handleAddNewBatch(item.id)}
+                                                                    disabled={isLoading === item.id}
+                                                                    className="text-green-600 hover:text-green-800 hover:bg-green-50 p-1 rounded transition-colors disabled:opacity-50"
+                                                                >
+                                                                    <Plus className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={handleCancelAddBatch}
+                                                                    className="text-gray-600 hover:text-gray-800 hover:bg-gray-50 p-1 rounded transition-colors"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : isExpanded ? (
+                                                    <tr className="bg-gray-50">
+                                                        <td colSpan={5} className="px-6 py-2">
+                                                            <button
+                                                                onClick={() => setAddingBatchFor(item.id)}
+                                                                className="w-full text-left text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-2"
+                                                            >
+                                                                <Plus className="w-4 h-4" />
+                                                                <span>Add new batch</span>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ) : null}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </tbody>
@@ -309,7 +548,11 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
             {/* Mobile Cards */}
             <div className="md:hidden space-y-3">
                 {sortedItems.map((item) => {
-                    const stockStatus = getStockStatus(item.quantity);
+                    const calculatedQuantity = getCalculatedQuantity(item);
+                    const stockStatus = getStockStatus(calculatedQuantity);
+                    const hasBatches = item.batches && item.batches.length > 0;
+                    const isExpanded = expandedItems.has(item.id);
+                    
                     return (
                         <Card
                             key={item.id}
@@ -367,6 +610,164 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                         </button>
                                     </div>
 
+                                    {/* Expiry Info */}
+                                    {hasBatches && (
+                                        <div className="flex items-center justify-between bg-white rounded-lg p-3 border">
+                                            <div className="flex items-center space-x-2">
+                                                <Calendar className="w-4 h-4 text-gray-400" />
+                                                <span className="text-sm font-medium text-gray-700">
+                                                    Expiry
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                {hasBatches ? (
+                                                    <>
+                                                        <span className="text-sm text-gray-600">
+                                                            {item.batches!.length} batch{item.batches!.length !== 1 ? 'es' : ''}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => toggleExpanded(item.id)}
+                                                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                                        >
+                                                            <ChevronRight 
+                                                                className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+                                                            />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-sm text-gray-500">No batches</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Expanded Batches */}
+                                    {isExpanded && hasBatches && (
+                                        <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+                                            {item.batches!.map((batch) => (
+                                                <div key={batch.id} className="bg-white rounded-lg p-3 border">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span 
+                                                            className="text-sm font-medium text-gray-700 cursor-help"
+                                                            title={formatCreatedDate(batch.created_at).fullDate}
+                                                        >
+                                                            {formatCreatedDate(batch.created_at).text}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleDeleteBatch(batch.id)}
+                                                            disabled={isLoading === batch.id}
+                                                            className="text-red-600 hover:text-red-800 p-1 rounded"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-sm text-gray-600">Quantity:</span>
+                                                            {editingBatch === batch.id ? (
+                                                                <input
+                                                                    type="number"
+                                                                    defaultValue={batch.quantity}
+                                                                    className="w-20 p-1 border rounded text-sm"
+                                                                    onBlur={(e) => handleUpdateBatch(batch.id, 'quantity', parseInt(e.target.value))}
+                                                                    onKeyPress={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            handleUpdateBatch(batch.id, 'quantity', parseInt(e.currentTarget.value));
+                                                                        }
+                                                                    }}
+                                                                    autoFocus
+                                                                />
+                                                            ) : (
+                                                                <div className="flex items-center space-x-2">
+                                                                    <span className="text-sm font-medium">
+                                                                        {batch.quantity} units
+                                                                    </span>
+                                                                    <button
+                                                                        onClick={() => setEditingBatch(batch.id)}
+                                                                        className="p-1 hover:bg-gray-200 rounded"
+                                                                    >
+                                                                        <Edit className="w-3 h-3 text-gray-500" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-sm text-gray-600">Expiry Date:</span>
+                                                            <input
+                                                                type="date"
+                                                                defaultValue={batch.expire_date || ''}
+                                                                className="text-sm border rounded px-2 py-1"
+                                                                onChange={(e) => handleUpdateBatch(batch.id, 'expire_date', e.target.value || '')}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            
+                                            {/* Add new batch card for mobile - only show when expanded */}
+                                            {isExpanded && addingBatchFor === item.id ? (
+                                                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-sm font-medium text-blue-700">
+                                                            New Batch
+                                                        </span>
+                                                        <div className="flex items-center space-x-1">
+                                                            <button
+                                                                onClick={() => handleAddNewBatch(item.id)}
+                                                                disabled={isLoading === item.id}
+                                                                className="text-green-600 hover:text-green-800 p-1 rounded"
+                                                            >
+                                                                <Plus className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={handleCancelAddBatch}
+                                                                className="text-gray-600 hover:text-gray-800 p-1 rounded"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-sm text-gray-600">Quantity:</span>
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                value={newBatchData.quantity}
+                                                                className="w-20 p-1 border rounded text-sm"
+                                                                onChange={(e) => setNewBatchData({...newBatchData, quantity: Math.max(1, parseInt(e.target.value) || 1)})}
+                                                                autoFocus
+                                                            />
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-sm text-gray-600">Expiry Date:</span>
+                                                            <input
+                                                                type="date"
+                                                                value={newBatchData.expire_date}
+                                                                className="text-sm border rounded px-2 py-1"
+                                                                onChange={(e) => setNewBatchData({...newBatchData, expire_date: e.target.value})}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : isExpanded ? (
+                                                <div className="bg-gray-50 rounded-lg p-3 border">
+                                                    <button
+                                                        onClick={() => setAddingBatchFor(item.id)}
+                                                        className="w-full text-left text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-2"
+                                                    >
+                                                        <Plus className="w-4 h-4" />
+                                                        <span>Add new batch</span>
+                                                    </button>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    )}
+
                                     {/* Quantity Control */}
                                     <div className="flex items-center justify-between bg-white rounded-lg p-3 border">
                                         <div className="flex items-center space-x-2">
@@ -379,37 +780,13 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                                                 {stockStatus.label}
                                             </span>
                                         </div>
-                                        <div className="flex items-center space-x-3">
-                                            <button
-                                                onClick={() =>
-                                                    handleQuantityChange(
-                                                        item.id,
-                                                        -1
-                                                    )
-                                                }
-                                                disabled={
-                                                    item.quantity <= 0 ||
-                                                    isLoading === item.id
-                                                }
-                                                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                <Minus className="w-4 h-4" />
-                                            </button>
-                                            <span className="text-xl font-bold text-gray-900 min-w-[2ch] text-center">
-                                                {item.quantity}
+                                        <div className="text-center">
+                                            <span className="text-xl font-bold text-gray-900">
+                                                {calculatedQuantity}
                                             </span>
-                                            <button
-                                                onClick={() =>
-                                                    handleQuantityChange(
-                                                        item.id,
-                                                        1
-                                                    )
-                                                }
-                                                disabled={isLoading === item.id}
-                                                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 flex items-center justify-center transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                            </button>
+                                            <div className="text-xs text-gray-500">
+                                                {hasBatches ? item.batches!.length : 1} batch{hasBatches && item.batches!.length !== 1 ? 'es' : ''}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
