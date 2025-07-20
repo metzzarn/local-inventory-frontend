@@ -15,6 +15,7 @@ import { Item, ItemBatch } from "@/types";
 import { ViewMode } from "./AppRouter";
 import { InventoryTable } from "./InventoryTable";
 import { AddItemForm } from "./AddItemForm";
+import { API_ENDPOINTS } from "@/config/api";
 
 interface InventoryManagerProps {
     onNavigate: (view: ViewMode) => void;
@@ -51,7 +52,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     const fetchItems = async () => {
         try {
             const response = await makeRequest(
-                "http://localhost:3001/api/items"
+                API_ENDPOINTS.ITEMS
             );
             const data = await response.json();
             setItems(data);
@@ -75,7 +76,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     }) => {
         try {
             const response = await makeRequest(
-                "http://localhost:3001/api/items",
+                API_ENDPOINTS.ITEMS,
                 {
                     method: "POST",
                     body: JSON.stringify(itemData),
@@ -96,7 +97,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     const handleUpdateBatch = async (batchId: number, field: 'quantity' | 'expire_date', value: string | number) => {
         try {
             const response = await makeRequest(
-                `http://localhost:3001/api/items/batches/${batchId}`,
+                API_ENDPOINTS.BATCH(batchId),
                 {
                     method: "PUT",
                     body: JSON.stringify({ [field]: value }),
@@ -115,7 +116,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     const handleDeleteBatch = async (batchId: number) => {
         try {
             const response = await makeRequest(
-                `http://localhost:3001/api/items/batches/${batchId}`,
+                API_ENDPOINTS.BATCH(batchId),
                 {
                     method: "DELETE",
                 }
@@ -132,7 +133,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     const handleAddBatch = async (itemId: number, quantity: number, expireDate: string | null) => {
         try {
             const response = await makeRequest(
-                `http://localhost:3001/api/items/${itemId}/batches`,
+                API_ENDPOINTS.ITEM_BATCHES(itemId),
                 {
                     method: "POST",
                     body: JSON.stringify({ quantity, expire_date: expireDate }),
@@ -150,7 +151,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     const handleDeleteItem = async (id: number) => {
         if (window.confirm("Are you sure you want to delete this item?")) {
             try {
-                await makeRequest(`http://localhost:3001/api/items/${id}`, {
+                await makeRequest(API_ENDPOINTS.ITEM(id), {
                     method: "DELETE",
                 });
 
@@ -177,7 +178,7 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
         };
 
         const response = await makeRequest(
-            `http://localhost:3001/api/items/${id}`,
+            API_ENDPOINTS.ITEM(id),
             {
                 method: "PUT",
                 body: JSON.stringify(updatedItemData),

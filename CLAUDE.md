@@ -26,7 +26,7 @@ This is a React TypeScript inventory management application with the following a
 - **Frontend**: React 18 with TypeScript, Vite build tool
 - **Styling**: Tailwind CSS with custom UI components
 - **State Management**: React Context API for authentication
-- **Backend Communication**: RESTful API calls to `http://localhost:3001`
+- **Backend Communication**: RESTful API calls via configurable `REACT_APP_API_URL`
 
 ### Key Components
 
@@ -54,7 +54,7 @@ This is a React TypeScript inventory management application with the following a
 - Persistent authentication state
 
 ### API Endpoints
-The frontend communicates with a backend API at `http://localhost:3001/api/`:
+The frontend communicates with a backend API configured via `REACT_APP_API_URL` environment variable (defaults to `http://localhost:3001/api/`):
 - `POST /auth/login` - User login
 - `POST /auth/register` - User registration
 - `POST /auth/refresh` - Token refresh

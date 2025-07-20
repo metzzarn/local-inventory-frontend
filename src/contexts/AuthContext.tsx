@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { User, AuthResponse } from '../types';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface AuthContextType {
   user: User | null;
@@ -37,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string): Promise<AuthResponse> => {
     try {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      const response = await fetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (username: string, email: string, password: string): Promise<AuthResponse> => {
     try {
-      const response = await fetch('http://localhost:3001/api/auth/register', {
+      const response = await fetch(API_ENDPOINTS.REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -101,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async (): Promise<void> => {
     try {
       if (refreshToken) {
-        await fetch('http://localhost:3001/api/auth/logout', {
+        await fetch(API_ENDPOINTS.LOGOUT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -126,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!refreshToken) return false;
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/refresh', {
+      const response = await fetch(API_ENDPOINTS.REFRESH, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

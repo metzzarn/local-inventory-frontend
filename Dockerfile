@@ -7,11 +7,15 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
+
+# Accept build argument for API URL
+ARG REACT_APP_API_URL=http://localhost:3001
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
 
 # Build the application
 RUN npm run build
@@ -23,4 +27,4 @@ RUN npm install -g serve
 EXPOSE 3000
 
 # Start the application
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["serve", "-s", "dist", "-l", "tcp://0.0.0.0:3000"]

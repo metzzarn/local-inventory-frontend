@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { SimpleSelect } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
 import { Trash2, UserPlus, Shield, ShieldOff, User, Users, ArrowLeft } from 'lucide-react';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface AdminUser {
   id: number;
@@ -62,7 +63,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/admin/users', {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USERS, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -85,7 +86,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
   const createUser = async () => {
     try {
       setError(null);
-      const response = await fetch('http://localhost:3001/api/admin/users', {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USERS, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -113,7 +114,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
       setError(null);
       const newRole = currentRole === 'admin' ? 'user' : 'admin';
       
-      const response = await fetch(`http://localhost:3001/api/admin/users/${userId}/role`, {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USER_ROLE(userId), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -137,7 +138,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
   const toggleUserStatus = async (userId: number, currentStatus: boolean) => {
     try {
       setError(null);
-      const response = await fetch(`http://localhost:3001/api/admin/users/${userId}/status`, {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USER_STATUS(userId), {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -165,7 +166,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
 
     try {
       setError(null);
-      const response = await fetch(`http://localhost:3001/api/admin/users/${userId}`, {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USER(userId), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${accessToken}`,

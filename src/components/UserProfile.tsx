@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "../contexts/AuthContext";
 import { useApi } from "../hooks/useApi";
+import { API_ENDPOINTS } from "@/config/api";
 
 interface UserProfileProps {
     onBack: () => void;
@@ -49,7 +50,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
 
         try {
             const response = await makeRequest(
-                "http://localhost:3001/api/user/profile",
+                API_ENDPOINTS.USER_PROFILE,
                 {
                     method: "PUT",
                     body: JSON.stringify({
@@ -96,7 +97,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
         }
 
         try {
-            await makeRequest("http://localhost:3001/api/user/password", {
+            await makeRequest(API_ENDPOINTS.USER_PASSWORD, {
                 method: "PUT",
                 body: JSON.stringify({
                     currentPassword: profileData.currentPassword,
