@@ -14,8 +14,8 @@ RUN npm ci
 COPY . .
 
 # Accept build argument for API URL
-ARG REACT_APP_API_URL=http://localhost:3001
-ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ARG VITE_API_URL=http://localhost:3001
+ENV VITE_API_URL=$VITE_API_URL
 
 # Build the application
 RUN npm run build
