@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
     PlusCircle,
     Plus,
-    Camera,
-    XCircle,
     LogOut,
     Settings,
     Menu,
@@ -46,12 +44,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         setShowAlert(false);
         setAlertMessage("");
     };
-    const [showScanner, setShowScanner] = useState(false);
-    const [stream, setStream] = useState<MediaStream | null>(null);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
-
-    const videoRef = useRef<HTMLVideoElement>(null);
 
     // Fetch items with authentication
     const fetchItems = async () => {
@@ -70,47 +64,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         fetchItems();
     }, []);
 
-    useEffect(() => {
-        return () => {
-            if (stream) {
-                stream.getTracks().forEach((track) => track.stop());
-            }
-        };
-    }, [stream]);
 
-    const startCamera = async () => {
-        try {
-            const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" },
-            });
-            setStream(mediaStream);
-            if (videoRef.current) {
-                videoRef.current.srcObject = mediaStream;
-            }
-            setShowScanner(true);
-        } catch (err) {
-            console.error("Error accessing camera:", err);
-            alert("Could not access the camera. Please check permissions.");
-        }
-    };
-
-    const stopCamera = () => {
-        if (stream) {
-            stream.getTracks().forEach((track) => track.stop());
-            setStream(null);
-        }
-        setShowScanner(false);
-    };
-
-    const handleScan = () => {
-        const mockScannedItem = {
-            name: "Scanned Item " + Math.floor(Math.random() * 1000),
-            category: "Scanned",
-        };
-        setNewItem(mockScannedItem);
-        setShowAddForm(true);
-        stopCamera();
-    };
 
     // Note: Direct quantity changes removed - items now always use batch management
 
@@ -329,41 +283,6 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
             </div>
 
             <div className="p-4 max-w-4xl mx-auto">
-                {/* Scanner Interface */}
-                {showScanner && (
-                    <Card className="mb-4">
-                        <CardContent className="p-4">
-                            <div className="relative aspect-video w-full max-w-md mx-auto mb-4">
-                                <video
-                                    ref={videoRef}
-                                    autoPlay
-                                    playsInline
-                                    className="w-full h-full rounded-lg"
-                                />
-                                <div className="absolute inset-0 border-2 border-red-500 pointer-events-none rounded-lg">
-                                    <div className="absolute inset-x-0 top-1/2 h-0.5 bg-red-500" />
-                                    <div className="absolute inset-y-0 left-1/2 w-0.5 bg-red-500" />
-                                </div>
-                            </div>
-                            <div className="flex justify-center gap-3">
-                                <button
-                                    onClick={handleScan}
-                                    className="bg-green-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 min-h-[44px]"
-                                >
-                                    <Camera className="w-4 h-4" />
-                                    Capture
-                                </button>
-                                <button
-                                    onClick={stopCamera}
-                                    className="bg-red-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 min-h-[44px]"
-                                >
-                                    <XCircle className="w-4 h-4" />
-                                    Cancel
-                                </button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
 
                 {/* Add Item Form */}
                 {showAddForm && (
@@ -384,14 +303,8 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
                     </Alert>
                 )}
 
-                {/* Floating Action Buttons */}
-                <div className="fixed bottom-4 right-4 flex flex-col gap-3 z-30">
-                    <button
-                        className="bg-purple-500 text-white p-4 rounded-full shadow-lg hover:bg-purple-600 min-h-[56px] min-w-[56px]"
-                        onClick={startCamera}
-                    >
-                        <Camera className="w-6 h-6" />
-                    </button>
+                {/* Floating Action Button */}
+                <div className="fixed bottom-4 right-4 z-30">
                     <button
                         className="bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 min-h-[56px] min-w-[56px]"
                         onClick={() => setShowAddForm(true)}
@@ -421,23 +334,15 @@ const handleUpdateItem = async (id: number, field: keyof Item, value: string) =>
                         </h3>
                         <p className="text-gray-500 mb-8 max-w-sm mx-auto">
                             Start building your inventory by adding your first
-                            item. Use the + button or scan a barcode to get
-                            started.
+                            item. Use the + button to get started.
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <div className="flex justify-center">
                             <button
                                 onClick={() => setShowAddForm(true)}
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200 flex items-center justify-center gap-2"
                             >
                                 <Plus className="w-5 h-5" />
                                 Add First Item
-                            </button>
-                            <button
-                                onClick={startCamera}
-                                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200 flex items-center justify-center gap-2"
-                            >
-                                <Camera className="w-5 h-5" />
-                                Scan Barcode
                             </button>
                         </div>
                     </div>

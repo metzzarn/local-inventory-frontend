@@ -49,7 +49,6 @@ This is a React TypeScript inventory management application with the following a
 ### Key Features
 - JWT-based authentication with refresh tokens
 - Mobile-responsive design with touch-friendly interfaces
-- Barcode scanning capability (mock implementation)
 - Real-time inventory quantity adjustments
 - Inline editing of inventory items
 - Persistent authentication state
@@ -86,4 +85,3 @@ Custom UI components in `src/components/ui/`:
 - Touch-friendly button sizes (minimum 44px)
 - Responsive breakpoints for different screen sizes
 - Mobile-specific navigation patterns
-- Camera API integration for barcode scanning
